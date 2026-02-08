@@ -1,13 +1,13 @@
 name: immortalwrt_x86_64
 
 on:
-  #  schedule:
-  #    - cron: 0 16 * * *
+#  schedule:
+#    - cron: 0 16 * * *
   workflow_dispatch:
 
 env:
   REPO_URL: https://github.com/DHDAXCW/immortalwrt
-  REPO_BRANCH: openwrt-23.05
+  REPO_BRANCH: openwrt-24.10
   CONFIG_FILE: immortalwrt/x86_64/nodocker.config
   DIY_P1_SH: immortalwrt/diy-part1.sh
   DIY_P2_SH: immortalwrt/diy-part2_1.sh
@@ -16,27 +16,24 @@ env:
   TZ: Asia/Shanghai
   OPENWRT_NAME: immortalwrt
   OPENWRT_NAME1: x86_64
-  FIRMWARE_TAG: X86_64-immortalwrt
-  TIME_STAMP: ${{ github.run_id }}-${{ github.run_number }}
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
-    timeout-minutes: 300
+    runs-on: ubuntu-latest
 
     steps:
     - name: Maximize build space
       uses: easimon/maximize-build-space@master
       with:
         root-reserve-mb: 512
-        swap-size-mb: 4096  # 增大交换空间，避免编译内存不足
+        swap-size-mb: 1024
         remove-dotnet: 'true'
         remove-android: 'true'
         remove-haskell: 'true'
         remove-codeql: 'true'
         
     - name: Check out the project branch
-      uses: actions/checkout@v4
+      uses: actions/checkout@main
       with:
           fetch-depth: 0
           
@@ -49,116 +46,53 @@ jobs:
         sudo apt-get -qq clean || true
         sudo rm -rf /var/lib/apt/lists/* || true
         rm -rf ~/.cache/* || true
-        # 新增：检查磁盘空间
-        df -h
         echo "Cache cleanup complete."
 
     - name: Initialize the compilation environment
       env:
         DEBIAN_FRONTEND: noninteractive
       run: |
-        set -e
-        # 第一步：更新源（前台执行，确保完成）
-        sudo -E apt-get -qq update
-        
-        # 第二步：安装核心依赖（显式安装rename，前台执行）
-        sudo -E apt-get -qq install -y \
-          build-essential clang flex g++ gawk gcc-multilib gettext \
-          git libncurses5-dev libssl-dev python3-distutils rsync unzip zlib1g-dev \
-          swig libpython3-dev aria2 jq subversion qemu-utils ccache libelf-dev \
-          rename  # 显式安装rename工具
-        
-        # 第三步：清理无用包（前台执行）
-        sudo -E apt-get -qq purge -y \
-          azure-cli ghc* zulu* hhvm llvm* firefox powershell openjdk* dotnet* \
-          google* mysql* php* android* speedtest-cli
-        
-        # 第四步：删除无用目录+清理缓存
+        ( sudo -E apt-get -qq update
+        sudo -E apt-get -qq install build-essential clang flex g++ gawk gcc-multilib gettext \
+        git libncurses5-dev libssl-dev python3-distutils rsync unzip zlib1g-dev swig libpython3-dev aria2 jq subversion qemu-utils ccache rename libelf-dev
+        sudo -E apt-get -qq purge azure-cli ghc* zulu* hhvm llvm* firefox powershell openjdk* dotnet* google* mysql* php* android* rename speedtest-cli
         sudo rm -rf /etc/apt/sources.list.d/* /usr/share/dotnet /usr/local/lib/android /opt/ghc
-        sudo -E apt-get -qq autoremove --purge -y
-        sudo -E apt-get -qq clean -y
-        
-        # 第五步：设置时区
+        sudo -E apt-get -qq autoremove --purge
+        sudo -E apt-get -qq clean ) &
         sudo timedatectl set-timezone "$TZ"
         
-        # 第六步：验证核心依赖（分步检查，更易定位问题）
-        echo "===== 验证核心依赖 ====="
-        if ! command -v gcc &> /dev/null; then
-          echo "Error: gcc 未安装"
-          exit 1
-        fi
-        if ! command -v make &> /dev/null; then
-          echo "Error: make 未安装"
-          exit 1
-        fi
-        if ! command -v rename &> /dev/null; then
-          echo "Error: rename 未安装"
-          exit 1
-        fi
-        echo "核心依赖安装成功"
+    - name: Initialize Environment and Display System Info
+      env:
+        DEBIAN_FRONTEND: noninteractive
+      run: |
+        chmod +x $OPENWRT_NAME/*.sh
+        $GITHUB_WORKSPACE/$OPENWRT_NAME/system-Information.sh
         
     - name: Download firmware source code
       run: |
-        set -e
         git clone --depth 1 $REPO_URL -b $REPO_BRANCH openwrt
-        # 修复：克隆源码后再检查/执行系统信息脚本，时机正确
-        if [ -d "$OPENWRT_NAME" ]; then
-          chmod +x $OPENWRT_NAME/*.sh || true
-          if [ -f "$GITHUB_WORKSPACE/$OPENWRT_NAME/system-Information.sh" ]; then
-            $GITHUB_WORKSPACE/$OPENWRT_NAME/system-Information.sh
-          else
-            echo "Warning: system-Information.sh not found"
-          fi
-        fi
-        
+
     - name: Update & install feeds
       working-directory: ./openwrt
       run: |
-        set -e
         ./scripts/feeds update -a
         ./scripts/feeds install -a
         
     - name: Load feeds.conf.default
       run: |
-        set -e
-        if [ -f "$DIY_P1_SH" ]; then
-          chmod +x "$DIY_P1_SH"
-          cd openwrt
-          "$GITHUB_WORKSPACE/$DIY_P1_SH"
-        else
-          echo "Warning: $DIY_P1_SH not found"
-        fi
+        chmod +x $OPENWRT_NAME/*.sh
+        cd openwrt
+        $GITHUB_WORKSPACE/$DIY_P1_SH
 
     - name: Load config
       run: |
-        set -e
-        # 加载配置文件
-        if [ -e "$CONFIG_FILE" ]; then
-          cat "$CONFIG_FILE" > openwrt/.config
-        else
-          echo "Error: $CONFIG_FILE not found, exit"
-          exit 1
-        fi
-        # 执行DIY_P2_SH
-        if [ -f "$DIY_P2_SH" ]; then
-          chmod +x "$DIY_P2_SH"
-          cd openwrt
-          "$GITHUB_WORKSPACE/$DIY_P2_SH"
-        else
-          echo "Warning: $DIY_P2_SH not found"
-        fi
-        # 新增：强制确认x86_64编译目标，防止配置文件错误
-        cd openwrt
-        echo "===== 确认编译目标系统 ====="
-        grep -E "TARGET_ARCH|TARGET_SUBTARGET|TARGET_BOARD" .config
-        echo "CONFIG_TARGET_x86=y" >> .config
-        echo "CONFIG_TARGET_x86_64=y" >> .config
-        echo "CONFIG_TARGET_x86_64_Generic=y" >> .config
+        [ -e "$CONFIG_FILE" ] && cat "$CONFIG_FILE" > openwrt/.config
+        chmod +x $OPENWRT_NAME/*.sh && cd openwrt
+        $GITHUB_WORKSPACE/$DIY_P2_SH
 
     - name: Download the installation package
       id: package
       run: |
-        set -e
         cd openwrt
         make defconfig
         cat .config
@@ -169,46 +103,36 @@ jobs:
     - name: Compile the firmware
       id: compile
       run: |
-        set -e
         cd openwrt
         echo -e "$(nproc) thread compile"
-        # 编译失败时终止流程，避免后续无效步骤
-        make -j$(nproc) || { make -j1 V=s; echo "编译失败"; exit 1; }
+        make -j$(nproc) || make -j1 || make -j1 V=s
         echo "date1=$(date +'%Y.%m.%d')" >> $GITHUB_ENV
         echo "date2=$(date "+%Y年%m月%d日")" >> $GITHUB_ENV
         echo "status=success" >> $GITHUB_OUTPUT
 
     - name: Organize and Rename Files
       id: organize
-      if: ${{ env.UPLOAD_FIRMWARE == 'true' && steps.compile.outputs.status == 'success' && !cancelled() }}
+      if: ${{ env.UPLOAD_FIRMWARE == 'true' && !cancelled() }}
       run: |
-        set -e
         cd openwrt/bin/targets/x86/64
-        # 修复：仅删除无用文件，保留核心固件（*.bin、*.img.gz）
-        rm -rf packages *rootfs.tar.gz *.config *.buildinfo *.json sha256sums *.manifest || true
-        # 新增：列出保留的文件，便于调试
-        echo "===== 保留的固件文件 ====="
-        ls -lh
+        rm -rf packages *rootfs.tar.gz *rootfs.img.gz *combined.img.gz *.bin *.config *.buildinfo *.json sha256sums *.manifest
         echo "FIRMWARE=$PWD" >> $GITHUB_ENV
         echo "status=success" >> $GITHUB_OUTPUT
         
     - name: Upload the firmware to github
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@main
       if: steps.organize.outputs.status == 'success' && !cancelled()
       with:
-        name: ${{ env.date1 }}_${{ env.FIRMWARE_TAG }}_${{ env.TIME_STAMP }}
+        name: ${{ env.date1 }}_${{ env.OPENWRT_NAME }}_${{ env.OPENWRT_NAME1 }}
         path: ${{ env.FIRMWARE }}
-        retention-days: 30
 
     - name: Generate release tags
       id: tag
-      if: env.UPLOAD_RELEASE == 'true' && steps.compile.outputs.status == 'success' && !cancelled()
+      if: env.UPLOAD_RELEASE == 'true' && !cancelled()
       run: |
-        set -e
-        echo "release_tag=${{ env.date2 }}_${{ env.FIRMWARE_TAG }}_${{ env.TIME_STAMP }}" >> $GITHUB_OUTPUT
+        echo "release_tag=${{ env.date2 }}" >> $GITHUB_OUTPUT
         touch release.txt
-        echo "📥 固件下载（${{ env.FIRMWARE_TAG }}）" >> release.txt
-        echo "⏱ 编译时间：${{ env.date2 }}" >> release.txt
+        echo "📥 固件下载" >> release.txt
         echo "status=success" >> $GITHUB_OUTPUT
         
     - name: Publish to release
@@ -218,8 +142,6 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         files: ${{ env.FIRMWARE }}/*
-        name: ${{ env.date2 }}_${{ env.FIRMWARE_TAG }}_${{ env.TIME_STAMP }}
+        name: ${{ env.date3 }}
         tag_name: ${{ steps.tag.outputs.release_tag }}
         body_path: release.txt
-        overwrite: true
-        prerelease: false
