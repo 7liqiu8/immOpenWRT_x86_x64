@@ -2,8 +2,8 @@ name: immortalwrt_x86_64_docker
 
 on:
   schedule:
-    - cron: 0 16 * * *
-  workflow_dispatch:
+#    - cron: 0 16 * * *
+#  workflow_dispatch:
 
 env:
   REPO_URL: https://github.com/DHDAXCW/immortalwrt
