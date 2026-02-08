@@ -7,7 +7,7 @@ on:
 
 env:
   REPO_URL: https://github.com/immortalwrt/immortalwrt
-  REPO_BRANCH: openwrt-24.10
+  REPO_BRANCH: openwrt-23.05
   CONFIG_FILE: immortalwrt/x86_64/nodocker.config
   DIY_P1_SH: immortalwrt/diy-part1.sh
   DIY_P2_SH: immortalwrt/diy-part2_1.sh
@@ -15,7 +15,7 @@ env:
   UPLOAD_RELEASE: true
   TZ: Asia/Shanghai
   OPENWRT_NAME: immortalwrt
-  OPENWRT_NAME1: x86_64
+  OPENWRT_NAME1: x86
 
 jobs:
   build:
@@ -112,7 +112,7 @@ jobs:
 
     - name: Organize and Rename Files
       id: organize
-      if: ${{ env.UPLOAD_FIRMWARE == 'true' && !cancelled() }}
+      if: ${{ env.UPLOAD_FIRMWARE == 'true' && steps.compile.outcome == 'success' }}
       run: |
         # 自动识别架构目录，避免硬编码 x86/64
         cd openwrt/bin/targets/*/*
@@ -132,17 +132,23 @@ jobs:
       id: tag
       if: env.UPLOAD_RELEASE == 'true' && !cancelled()
       run: |
-        # 提取配置文件夹名 (例如: x86_64)
-        CONFIG_VARIANT=$(basename $(dirname $CONFIG_FILE))
+        # 提取目录名 (例如 x86_64)
+        DIR_NAME=$(basename $(dirname $CONFIG_FILE))
         
-        # 生成带分钟的 Tag (例如: 2024.05.20_x86_64_1630)
+        # 提取文件名并去掉扩展名 (例如 docker.config -> docker)
+        FILE_NAME=$(basename $CONFIG_FILE | cut -d. -f1)
+        
+        # 组合成最终标识 (例如 x86_64_docker)
+        CONFIG_VARIANT="${DIR_NAME}_${FILE_NAME}"
+        
+        # 生成带分钟的 Tag (例如: 2024.05.20_x86_64_docker_1630)
         RELEASE_TAG="${{ env.date1 }}_${CONFIG_VARIANT}_${{ env.date3 }}"
         echo "release_tag=$RELEASE_TAG" >> $GITHUB_OUTPUT
         
         touch release.txt
         echo "📥 固件下载" >> release.txt
-        echo "- 编译架构: ${CONFIG_VARIANT}" >> release.txt
-        echo "- 配置文件: ${CONFIG_FILE}" >> release.txt
+        echo "- 编译配置: ${CONFIG_VARIANT}" >> release.txt
+        echo "- 完整路径: ${CONFIG_FILE}" >> release.txt
         echo "- 编译完成时间: ${{ env.date2 }}" >> release.txt
         echo "status=success" >> $GITHUB_OUTPUT
         
