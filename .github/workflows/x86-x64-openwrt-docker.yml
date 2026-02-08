@@ -1,4 +1,4 @@
-name: immortalwrt_x86_64
+name: immortalwrt_x86_64_docker
 
 on:
 #  schedule:
@@ -8,14 +8,14 @@ on:
 env:
   REPO_URL: https://github.com/immortalwrt/immortalwrt
   REPO_BRANCH: openwrt-23.05
-  CONFIG_FILE: immortalwrt/x86_64/nodocker.config
+  CONFIG_FILE: immortalwrt/x86_64/docker.config
   DIY_P1_SH: immortalwrt/diy-part1.sh
-  DIY_P2_SH: immortalwrt/diy-part2.sh
+  DIY_P2_SH: immortalwrt/diy-part2_1.sh
   UPLOAD_FIRMWARE: true
   UPLOAD_RELEASE: true
   TZ: Asia/Shanghai
   OPENWRT_NAME: immortalwrt
-  OPENWRT_NAME1: x86_64
+  OPENWRT_NAME1: x86_64_docker
 
 jobs:
   build:
@@ -95,7 +95,6 @@ jobs:
       run: |
         cd openwrt
         make defconfig
-        cat .config
         make download -j$(nproc)
         find dl -size -1024c -exec ls -l {} \;
         find dl -size -1024c -exec rm -f {} \;
@@ -107,14 +106,16 @@ jobs:
         echo -e "$(nproc) thread compile"
         make -j$(nproc) || make -j1 || make -j1 V=s
         echo "date1=$(date +'%Y.%m.%d')" >> $GITHUB_ENV
-        echo "date2=$(date "+%Y年%m月%d日")" >> $GITHUB_ENV
+        echo "date2=$(date "+%Y年%m月%d日%H:%M")" >> $GITHUB_ENV
+        echo "date3=$(date +'%H%M')" >> $GITHUB_ENV
         echo "status=success" >> $GITHUB_OUTPUT
 
     - name: Organize and Rename Files
       id: organize
       if: ${{ env.UPLOAD_FIRMWARE == 'true' && !cancelled() }}
       run: |
-        cd openwrt/bin/targets/x86/64
+        # 自动识别架构目录，避免硬编码 x86/64
+        cd openwrt/bin/targets/*/*
         rm -rf packages *rootfs.tar.gz *rootfs.img.gz *combined.img.gz *.bin *.config *.buildinfo *.json sha256sums *.manifest
         echo "FIRMWARE=$PWD" >> $GITHUB_ENV
         echo "status=success" >> $GITHUB_OUTPUT
@@ -123,16 +124,26 @@ jobs:
       uses: actions/upload-artifact@main
       if: steps.organize.outputs.status == 'success' && !cancelled()
       with:
-        name: ${{ env.date1 }}_${{ env.OPENWRT_NAME }}_${{ env.OPENWRT_NAME1 }}
+        # Artifact 名称也加入时间戳，防止下载错版本
+        name: ${{ env.date1 }}_${{ env.OPENWRT_NAME }}_${{ env.OPENWRT_NAME1 }}_${{ env.date3 }}
         path: ${{ env.FIRMWARE }}
 
     - name: Generate release tags
       id: tag
       if: env.UPLOAD_RELEASE == 'true' && !cancelled()
       run: |
-        echo "release_tag=${{ env.date2 }}" >> $GITHUB_OUTPUT
+        # 提取配置文件夹名 (例如: x86_64)
+        CONFIG_VARIANT=$(basename $(dirname $CONFIG_FILE))
+        
+        # 生成带分钟的 Tag (例如: 2024.05.20_x86_64_1630)
+        RELEASE_TAG="${{ env.date1 }}_${CONFIG_VARIANT}_${{ env.date3 }}"
+        echo "release_tag=$RELEASE_TAG" >> $GITHUB_OUTPUT
+        
         touch release.txt
         echo "📥 固件下载" >> release.txt
+        echo "- 编译架构: ${CONFIG_VARIANT}" >> release.txt
+        echo "- 配置文件: ${CONFIG_FILE}" >> release.txt
+        echo "- 编译完成时间: ${{ env.date2 }}" >> release.txt
         echo "status=success" >> $GITHUB_OUTPUT
         
     - name: Publish to release
@@ -142,6 +153,6 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         files: ${{ env.FIRMWARE }}/*
-        name: ${{ env.date3 }}
+        name: ${{ steps.tag.outputs.release_tag }}
         tag_name: ${{ steps.tag.outputs.release_tag }}
         body_path: release.txt
