@@ -1,21 +1,21 @@
 name: immortalwrt_x86_64_docker
 
 on:
-#  schedule:
-#    - cron: 0 16 * * *
+  #  schedule:
+  #    - cron: 0 16 * * *
   workflow_dispatch:
 
 env:
   REPO_URL: https://github.com/DHDAXCW/immortalwrt
   REPO_BRANCH: openwrt-23.05
-  CONFIG_FILE: immortalwrt/x86_64/defconfig
+  CONFIG_FILE: immortalwrt/x86_64/docker.config
   DIY_P1_SH: immortalwrt/diy-part1.sh
   DIY_P2_SH: immortalwrt/diy-part2.sh
   UPLOAD_FIRMWARE: true
   UPLOAD_RELEASE: true
   TZ: Asia/Shanghai
   OPENWRT_NAME: immortalwrt
-  OPENWRT_NAME1: x86_64
+  OPENWRT_NAME1: x86_64_docker
 
 jobs:
   build:
@@ -47,7 +47,7 @@ jobs:
         sudo rm -rf /var/lib/apt/lists/* || true
         rm -rf ~/.cache/* || true
         echo "Cache cleanup complete."
-        
+
     - name: Initialize the compilation environment
       env:
         DEBIAN_FRONTEND: noninteractive
@@ -65,8 +65,16 @@ jobs:
       env:
         DEBIAN_FRONTEND: noninteractive
       run: |
-        chmod +x $OPENWRT_NAME/*.sh
-        $GITHUB_WORKSPACE/$OPENWRT_NAME/system-Information.sh
+        # 确保脚本存在且有执行权限
+        if [ -d "$OPENWRT_NAME" ]; then
+          chmod +x $OPENWRT_NAME/*.sh || true
+          # 检查system-Information.sh是否存在
+          if [ -f "$GITHUB_WORKSPACE/$OPENWRT_NAME/system-Information.sh" ]; then
+            $GITHUB_WORKSPACE/$OPENWRT_NAME/system-Information.sh
+          else
+            echo "Warning: system-Information.sh not found"
+          fi
+        fi
         
     - name: Download firmware source code
       run: |
@@ -80,32 +88,37 @@ jobs:
         
     - name: Load feeds.conf.default
       run: |
-        chmod +x $OPENWRT_NAME/*.sh
-        cd openwrt
-        $GITHUB_WORKSPACE/$DIY_P1_SH
+        if [ -f "$DIY_P1_SH" ]; then
+          chmod +x "$DIY_P1_SH"
+          cd openwrt
+          "$GITHUB_WORKSPACE/$DIY_P1_SH"
+        else
+          echo "Warning: $DIY_P1_SH not found"
+        fi
 
     - name: Load config
       run: |
-        [ -e "$CONFIG_FILE" ] && cat "$CONFIG_FILE" > openwrt/.config
-        chmod +x $OPENWRT_NAME/*.sh && cd openwrt
-        $GITHUB_WORKSPACE/$DIY_P2_SH
+        # 加载配置文件
+        if [ -e "$CONFIG_FILE" ]; then
+          cat "$CONFIG_FILE" > openwrt/.config
+        else
+          echo "Warning: $CONFIG_FILE not found"
+        fi
+        # 执行DIY_P2_SH
+        if [ -f "$DIY_P2_SH" ]; then
+          chmod +x "$DIY_P2_SH"
+          cd openwrt
+          "$GITHUB_WORKSPACE/$DIY_P2_SH"
+        else
+          echo "Warning: $DIY_P2_SH not found"
+        fi
 
     - name: Download the installation package
       id: package
       run: |
         cd openwrt
-        echo '
-        CONFIG_DOCKER_CGROUP_OPTIONS=y
-        CONFIG_DOCKER_NET_MACVLAN=y
-        CONFIG_DOCKER_STO_EXT4=y
-        CONFIG_PACKAGE_docker=y
-        CONFIG_PACKAGE_docker-compose=y
-        CONFIG_PACKAGE_dockerd=y
-        CONFIG_PACKAGE_luci-app-dockerman=y
-        CONFIG_PACKAGE_luci-i18n-dockerman-zh-cn=y
-        CONFIG_PACKAGE_luci-lib-docker=y
-        ' >> .config
         make defconfig
+        cat .config
         make download -j$(nproc)
         find dl -size -1024c -exec ls -l {} \;
         find dl -size -1024c -exec rm -f {} \;
@@ -125,10 +138,7 @@ jobs:
       if: ${{ env.UPLOAD_FIRMWARE == 'true' && !cancelled() }}
       run: |
         cd openwrt/bin/targets/x86/64
-        rm -rf packages *rootfs.tar.gz *rootfs.img.gz *combined.img.gz *.bin *.config *.buildinfo *.json sha256sums *.manifest
-        for file in immortalwrt-*-*.img.gz; do
-            mv "$file" "docker-$file"
-        done
+        rm -rf packages *rootfs.tar.gz *rootfs.img.gz *combined.img.gz *.bin *.config *.buildinfo *.json sha256sums *.manifest || true
         echo "FIRMWARE=$PWD" >> $GITHUB_ENV
         echo "status=success" >> $GITHUB_OUTPUT
         
@@ -155,6 +165,7 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         files: ${{ env.FIRMWARE }}/*
-        name: ${{ env.date3 }}
+        # 关键修复：将未定义的date3改为已定义的date2
+        name: ${{ env.date2 }}_${{ env.OPENWRT_NAME }}_${{ env.OPENWRT_NAME1 }}
         tag_name: ${{ steps.tag.outputs.release_tag }}
         body_path: release.txt
