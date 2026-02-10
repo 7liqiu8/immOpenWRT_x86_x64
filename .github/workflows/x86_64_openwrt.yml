@@ -15,7 +15,7 @@ env:
   UPLOAD_RELEASE: true
   TZ: Asia/Shanghai
   OPENWRT_NAME: immortalwrt
-  OPENWRT_NAME1: x86
+  OPENWRT_NAME1: x86_64
 
 jobs:
   build:
@@ -156,9 +156,12 @@ jobs:
       uses: softprops/action-gh-release@v1
       if: steps.tag.outputs.status == 'success' && !cancelled()
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # 关键修改：将默认的 GITHUB_TOKEN 替换为自定义的 GH_PAT
+        GITHUB_TOKEN: ${{ secrets.GH_PAT }}
       with:
         files: ${{ env.FIRMWARE }}/*
         name: ${{ steps.tag.outputs.release_tag }}
         tag_name: ${{ steps.tag.outputs.release_tag }}
         body_path: release.txt
+        # 新增：允许覆盖同名 Tag（避免重复运行时报错）
+        overwrite: true
