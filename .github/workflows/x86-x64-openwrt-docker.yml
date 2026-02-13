@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 env:
-  REPO_URL: https://github.com/immortalwrt/immortalwrt
+  REPO_URL: https://github.com/7liqiu8/immortalwrt
   REPO_BRANCH: openwrt-23.05
   CONFIG_FILE: immortalwrt/x86_64/docker.config
   DIY_P1_SH: immortalwrt/diy-part1.sh
