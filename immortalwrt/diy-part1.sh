@@ -34,3 +34,17 @@ popd
 # git clone https://github.com/sbwml/luci-app-mosdns -b v5 package/mosdns
 # git clone https://github.com/sbwml/v2ray-geodata package/v2ray-geodata
 git clone --depth=1 https://github.com/7liqiu8/mwan3nft package/mwan3nft
+
+
+grep "download-ci-llvm" "$RUST_MAKEFILE" || echo "Pattern not found, but will attempt replacement anyway."
+
+RUST_MAKEFILE="feeds/packages/lang/rust/Makefile"
+if [ -f "$RUST_MAKEFILE" ]; then
+    echo "Modifying Rust Makefile to disable download-ci-llvm for ImmortalWrt 24.10..."
+    # 方案1: 修改 --set llvm.download-ci-llvm=true 为 false
+    sed -i 's/--set llvm.download-ci-llvm=true/--set llvm.download-ci-llvm=false/' "$RUST_MAKEFILE"
+    # 方案2: 修改 --set=llvm.download-ci-llvm=true 为 false (论坛讨论中提到的格式[citation:2])
+    sed -i 's/--set=llvm.download-ci-llvm=true/--set=llvm.download-ci-llvm=false/' "$RUST_MAKEFILE"
+else
+    echo "Warning: Rust Makefile not found at $RUST_MAKEFILE"
+fi
