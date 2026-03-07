@@ -1,4 +1,4 @@
-name: immortalwrt_no2docker_x86_64
+name: 旁路由10_2
 
 on:
 #  schedule:
@@ -8,14 +8,14 @@ on:
 env:
   REPO_URL: https://github.com/immortalwrt/immortalwrt
   REPO_BRANCH: openwrt-24.10
-  CONFIG_FILE: immortalwrt/x86_64/no2docker.config
+  CONFIG_FILE: immortalwrt/x86_64/旁路由10_2.config
   DIY_P1_SH: immortalwrt/diy-part1.sh
-  DIY_P2_SH: immortalwrt/diy-part2.sh
+  DIY_P2_SH: immortalwrt/diy-part2.1sh
   UPLOAD_FIRMWARE: true
   UPLOAD_RELEASE: true
   TZ: Asia/Shanghai
   OPENWRT_NAME: immortalwrt
-  OPENWRT_NAME1: x86_64_no2docker
+  OPENWRT_NAME1: 旁路由10_2
 
 jobs:
   build:
