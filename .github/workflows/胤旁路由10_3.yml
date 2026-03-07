@@ -1,4 +1,4 @@
-name: 超简openwrt
+name: 胤旁路由10_3
 
 on:
 #  schedule:
@@ -8,14 +8,14 @@ on:
 env:
   REPO_URL: https://github.com/immortalwrt/immortalwrt
   REPO_BRANCH: openwrt-24.10
-  CONFIG_FILE: immortalwrt/x86_64/超简.config
+  CONFIG_FILE: immortalwrt/x86_64/胤旁路由10_3.config
   DIY_P1_SH: immortalwrt/diy-part1.sh
   DIY_P2_SH: immortalwrt/diy-part2_2.sh
   UPLOAD_FIRMWARE: true
   UPLOAD_RELEASE: true
   TZ: Asia/Shanghai
   OPENWRT_NAME: immortalwrt
-  OPENWRT_NAME1: x86_64_超简
+  OPENWRT_NAME1: 胤旁路由10_3
 
 jobs:
   build:
