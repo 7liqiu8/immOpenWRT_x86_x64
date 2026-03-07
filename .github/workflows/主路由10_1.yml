@@ -1,4 +1,4 @@
-name: 精简-mwan3
+name: 主路由10_1
 
 on:
 #  schedule:
@@ -7,15 +7,15 @@ on:
 
 env:
   REPO_URL: https://github.com/immortalwrt/immortalwrt
-  REPO_BRANCH: openwrt-23.05
-  CONFIG_FILE: immortalwrt/x86_64/精简-mwan3.config
+  REPO_BRANCH: openwrt-24.10
+  CONFIG_FILE: immortalwrt/x86_64/主路由10_1.config
   DIY_P1_SH: immortalwrt/diy-part1.sh
-  DIY_P2_SH: immortalwrt/diy-part2_1.sh
+  DIY_P2_SH: immortalwrt/diy-part2.sh
   UPLOAD_FIRMWARE: true
   UPLOAD_RELEASE: true
   TZ: Asia/Shanghai
   OPENWRT_NAME: immortalwrt
-  OPENWRT_NAME1: 精简-mwan3
+  OPENWRT_NAME1: 主路由10_1
 
 jobs:
   build:
